@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler
 def sanitize_user_input(text):
     if not text:
         return ""
-    # Remove potentially breaking markdown injection tags
+    # Strip dangerous layout control parameters
     clean_text = re.sub(r'[<>{}\[\]\\^\`|~]', '', text)
     return clean_text.strip()[:300]
 
@@ -16,7 +16,7 @@ def search_google_cse(query):
     cse_id = os.environ.get("GOOGLE_CSE_ID")
     
     if not api_key or not cse_id:
-        return [{"snippet": "Configuration variables verification alert: Check your keys in Vercel settings.", "link": ""}]
+        return [{"snippet": "Configuration verification warning: Check your parameters in Vercel settings.", "link": ""}]
     
     url = "https://googleapis.com"
     params = {
@@ -28,59 +28,56 @@ def search_google_cse(query):
     
     try:
         res = requests.get(url, params=params, timeout=5)
-        # Prevent crash if response doesn't contain items
         if res.status_code != 200:
-            return [{"snippet": f"Google API returned error status {res.status_code}", "link": ""}]
-            
+            return [{"snippet": "Official documentation search throttle ceiling reached.", "link": ""}]
         items = res.json().get("items", [])
         if not items:
-            return [{"snippet": "No updates matching this query are listed on official portals.", "link": ""}]
-            
+            return [{"snippet": "No updates matching this timeline criteria are listed on official portals.", "link": ""}]
+        
         results = []
         for item in items:
             results.append({
-                "title": item.get("title", "Official Page Reference"),
+                "title": item.get("title", "Official Reference"),
                 "link": item.get("link", ""),
                 "snippet": item.get("snippet", "")
             })
         return results
-    except Exception as e:
-        return [{"snippet": f"Search engine temporarily unavailable: {str(e)}", "link": ""}]
+    except Exception:
+        return [{"snippet": "Official indices temporarily offline.", "link": ""}]
 
 def generate_ai_reply(query, context_list):
     gemini_key = os.environ.get("GEMINI_API_KEY")
     if not gemini_key:
-        return "Backend deployment error: Missing GEMINI_API_KEY variable configuration."
+        return "Backend deployment missing GEMINI_API_KEY variable configuration."
 
     context_str = ""
     for idx, ctx in enumerate(context_list):
         context_str += f"[Source {idx+1}]: {ctx['snippet']}\n"
 
     prompt = (
-        f"You are the professional Higher Education AI Assistant for Nagarjuna Government College, Nalgonda.\n"
-        f"You must strictly use the provided official context snippets to answer the user's question.\n"
-        f"Never invent deadlines, fees, or metrics. If details are not explicitly present, advise them to use the provided links.\n\n"
-        f"Official Context Data:\n{context_str}\n\n"
+        f"You are the conversational Telangana Higher Education AI Assistant for Nagarjuna Govt College.\n"
+        f"You must strictly use the provided official search context to answer the user's question.\n"
+        f"Never guess or make up data, deadlines, or fees. If the details are not explicitly present in the data, "
+        f"state clearly that it isn't listed in recent notices and advise them to use the linked official links.\n\n"
+        f"Context from Telangana Official Sites:\n{context_str}\n\n"
         f"Student Query: {query}\n\n"
-        f"Provide a friendly, conversational response:"
+        f"Provide a friendly, highly professional, conversational response:"
     )
 
-    # Secure endpoint template
-    url = f"https://googleapis.com{gemini_key}"
+    # FIXED: Clean, hardcoded endpoint parameters to block extraction loops
     headers = {"Content-Type": "application/json"}
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
+    target_endpoint = "https://googleapis.com"
 
     try:
-        res = requests.post(url, headers=headers, json=payload, timeout=8)
+        # Pass the key explicitly as an independent query argument parameter
+        res = requests.post(f"{target_endpoint}?key={gemini_key}", headers=headers, json=payload, timeout=8)
         res_json = res.json()
         
-        # Check for quota limits or API blocks explicitly to surface errors safely
         if 'candidates' in res_json and len(res_json['candidates']) > 0:
-            return res_json['candidates'][0]['content']['parts'][0]['text']
-        elif 'error' in res_json:
-            return f"Gemini API returned an alert: {res_json['error'].get('message', 'Unknown Error')}"
+            return res_json['candidates']['content']['parts']['text']
         else:
-            return "The AI engine could not parse a valid output content string. Please re-submit your query."
+            return "The AI engine could not finalize a content string parsing task. Please re-submit your query."
     except Exception as e:
         return f"AI communication link exception occurred: {str(e)}"
 
@@ -94,10 +91,9 @@ class handler(BaseHTTPRequestHandler):
                 current_dir = os.path.dirname(os.path.abspath(__file__))
                 html_path = os.path.join(current_dir, 'index.html')
                 with open(html_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                    self.wfile.write(content.encode('utf-8'))
+                    self.wfile.write(f.read().encode('utf-8'))
             except Exception as e:
-                self.wfile.write(f"HTML Core Render Error: {str(e)}".encode('utf-8'))
+                self.wfile.write(f"HTML Resource Read Failure: {str(e)}".encode('utf-8'))
             return
 
         self.send_response(200)
