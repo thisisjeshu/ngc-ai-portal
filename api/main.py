@@ -8,7 +8,7 @@ def search_google_cse(query):
     cse_id = os.environ.get("GOOGLE_CSE_ID")
     
     if not api_key or not cse_id:
-        return [{"snippet": "Backend variables configuration anomaly: Check GOOGLE_API_KEY / GOOGLE_CSE_ID.", "link": ""}]
+        return [{"snippet": "Backend variables configuration alert: Check GOOGLE_API_KEY / GOOGLE_CSE_ID in Vercel settings.", "link": ""}]
     
     url = "https://googleapis.com"
     params = {
@@ -24,33 +24,31 @@ def search_google_cse(query):
         results = []
         for item in items:
             results.append({
-                "title": item.get("title", "Official Framework Page"),
+                "title": item.get("title", "Official Portal Page"),
                 "link": item.get("link", ""),
                 "snippet": item.get("snippet", "")
             })
-        return results if results else [{"snippet": "No recent guidelines found across the college or state portals for this query.", "link": ""}]
+        return results if results else [{"snippet": "No recent updates matching this query found on the official portals.", "link": ""}]
     except Exception as e:
-        return [{"snippet": f"Search execution runtime alert: {str(e)}", "link": ""}]
+        return [{"snippet": f"Search execution failed: {str(e)}", "link": ""}]
 
 def generate_ai_reply(query, context_list):
     gemini_key = os.environ.get("GEMINI_API_KEY")
     if not gemini_key:
-        return "System failure: GEMINI_API_KEY is not defined in your project environment."
+        return "Backend deployment missing GEMINI_API_KEY environment configuration variable."
 
     context_str = ""
     for idx, ctx in enumerate(context_list):
-        context_str += f"[Official Data Link {idx+1}]: {ctx['snippet']}\n"
+        context_str += f"[Source {idx+1}]: {ctx['snippet']}\n"
 
-    # Strictly bounding the LLM context domain
     prompt = (
-        f"You are the conversational NGC AI Student Assistant for Nagarjuna Government College (Autonomous), Nalgonda.\n"
-        f"Your target audience consists of students, parents, and administrative staff seeking accurate data.\n"
-        f"CRITICAL CONSTRAINT: You must generate answers based solely on the provided official portal context fragments below.\n"
-        f"Do not invent structural procedures, registration timelines, fee values, or requirements. If the answer cannot be confidently verified "
-        f"by the text snippets provided, explicitly state that the specific notice isn't in recent documentation and provide direction to the relevant site links.\n\n"
-        f"Context from Verified College/State Portals:\n{context_str}\n\n"
+        f"You are the conversational Telangana Higher Education AI Assistant for Nagarjuna Govt College.\n"
+        f"You must strictly use the provided official search context to answer the user's question.\n"
+        f"Never guess or make up data, deadlines, or fees. If the details are not explicitly present in the data, "
+        f"state clearly that it isn't listed in recent notices and advise them to use the linked official links.\n\n"
+        f"Context from Telangana Official Sites:\n{context_str}\n\n"
         f"Student Query: {query}\n\n"
-        f"Formulate a direct, clear, highly structured, clean conversational markdown response:"
+        f"Provide a friendly, highly professional, markdown-formatted response:"
     )
 
     url = f"https://googleapis.com{gemini_key}"
@@ -61,8 +59,9 @@ def generate_ai_reply(query, context_list):
         res = requests.post(url, headers=headers, json=payload, timeout=8)
         return res.json()['candidates']['content']['parts']['text']
     except Exception as e:
-        return f"AI text processing engine failed to execute. Details: {str(e)}"
+        return f"AI generation bottleneck encountered. Details: {str(e)}"
 
+# The class name must be lowercase 'handler' for Vercel Serverless Architecture
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -72,12 +71,7 @@ class handler(BaseHTTPRequestHandler):
         return
 
     def do_POST(self):
-        # Crucial: Change this line to check for /api/main
-        if self.path != '/api/main':
-            self.send_response(404)
-            self.end_headers()
-            return
-
+        # We process the request directly without strict path routing checks
         content_length = int(self.headers['Content-Length'])
         req_body = json.loads(self.rfile.read(content_length).decode('utf-8'))
         user_query = req_body.get('message', '')
