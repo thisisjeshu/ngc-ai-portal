@@ -1,0 +1,95 @@
+requests==2.31.0
+import os
+import requests
+import json
+from http.server import BaseHTTPRequestHandler
+
+def search_google_cse(query):
+    api_key = os.environ.get("GOOGLE_API_KEY")
+    cse_id = os.environ.get("GOOGLE_CSE_ID")
+    
+    if not api_key or not cse_id:
+        return [{"snippet": "Backend variables configuration anomaly: Check GOOGLE_API_KEY / GOOGLE_CSE_ID.", "link": ""}]
+    
+    url = "https://googleapis.com"
+    params = {
+        "key": api_key,
+        "cx": cse_id,
+        "q": query,
+        "num": 4
+    }
+    
+    try:
+        res = requests.get(url, params=params, timeout=5)
+        items = res.json().get("items", [])
+        results = []
+        for item in items:
+            results.append({
+                "title": item.get("title", "Official Framework Page"),
+                "link": item.get("link", ""),
+                "snippet": item.get("snippet", "")
+            })
+        return results if results else [{"snippet": "No recent guidelines found across the college or state portals for this query.", "link": ""}]
+    except Exception as e:
+        return [{"snippet": f"Search execution runtime alert: {str(e)}", "link": ""}]
+
+def generate_ai_reply(query, context_list):
+    gemini_key = os.environ.get("GEMINI_API_KEY")
+    if not gemini_key:
+        return "System failure: GEMINI_API_KEY is not defined in your project environment."
+
+    context_str = ""
+    for idx, ctx in enumerate(context_list):
+        context_str += f"[Official Data Link {idx+1}]: {ctx['snippet']}\n"
+
+    # Strictly bounding the LLM context domain
+    prompt = (
+        f"You are the conversational NGC AI Student Assistant for Nagarjuna Government College (Autonomous), Nalgonda.\n"
+        f"Your target audience consists of students, parents, and administrative staff seeking accurate data.\n"
+        f"CRITICAL CONSTRAINT: You must generate answers based solely on the provided official portal context fragments below.\n"
+        f"Do not invent structural procedures, registration timelines, fee values, or requirements. If the answer cannot be confidently verified "
+        f"by the text snippets provided, explicitly state that the specific notice isn't in recent documentation and provide direction to the relevant site links.\n\n"
+        f"Context from Verified College/State Portals:\n{context_str}\n\n"
+        f"Student Query: {query}\n\n"
+        f"Formulate a direct, clear, highly structured, clean conversational markdown response:"
+    )
+
+    url = f"https://googleapis.com{gemini_key}"
+    headers = {"Content-Type": "application/json"}
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+
+    try:
+        res = requests.post(url, headers=headers, json=payload, timeout=8)
+        return res.json()['candidates']['content']['parts']['text']
+    except Exception as e:
+        return f"AI text processing engine failed to execute. Details: {str(e)}"
+
+class handler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        if self.path != '/api/chat':
+            self.send_response(404)
+            self.end_headers()
+            return
+
+        content_length = int(self.headers['Content-Length'])
+        req_body = json.loads(self.rfile.read(content_length).decode('utf-8'))
+        user_query = req_body.get('message', '')
+
+        if not user_query:
+            self.send_response(400)
+            self.end_headers()
+            return
+
+        sources = search_google_cse(user_query)
+        ai_reply = generate_ai_reply(user_query, sources)
+        valid_sources = [s for s in sources if s['link']]
+
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        
+        self.wfile.write(json.dumps({
+            "reply": ai_reply,
+            "sources": valid_sources
+        }).encode('utf-8'))
+        return
