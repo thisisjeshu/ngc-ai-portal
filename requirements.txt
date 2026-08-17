@@ -66,7 +66,7 @@ def generate_ai_reply(query, context_list):
 
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
-        if self.path != '/api/chat':
+        if self.path != '/api/main':
             self.send_response(404)
             self.end_headers()
             return
