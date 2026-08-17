@@ -64,7 +64,15 @@ def generate_ai_reply(query, context_list):
         return f"AI text processing engine failed to execute. Details: {str(e)}"
 
 class handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps({"status": "NGC AI Engine Operational"}).encode('utf-8'))
+        return
+
     def do_POST(self):
+        # Crucial: Change this line to check for /api/main
         if self.path != '/api/main':
             self.send_response(404)
             self.end_headers()
@@ -92,3 +100,4 @@ class handler(BaseHTTPRequestHandler):
             "sources": valid_sources
         }).encode('utf-8'))
         return
+
