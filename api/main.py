@@ -11,13 +11,14 @@ def sanitize_user_input(text):
     return clean_text.strip()[:300]
 
 def search_google_cse(query):
-    api_key = os.environ.get("GOOGLE_API_KEY", "").strip()
-    cse_id = os.environ.get("GOOGLE_CSE_ID", "").strip()
+    # Change these two lines to look for your fresh NGC_ prefixes
+    api_key = os.environ.get("NGC_GOOGLE_API_KEY", "").strip()
+    cse_id = os.environ.get("NGC_GOOGLE_CSE_ID", "").strip()
     
     if not api_key or not cse_id:
-        return [{"snippet": "Configuration Alert: Verify GOOGLE_API_KEY and GOOGLE_CSE_ID parameters in Vercel settings.", "link": ""}]
+        return [{"snippet": "Configuration Alert: Provide NGC_GOOGLE_API_KEY and NGC_GOOGLE_CSE_ID variables in Vercel settings.", "link": ""}]
     
-    # CRITICAL FIX: Ensure this exact string is perfectly clean with NO extra characters or variables attached to it
+    # Completely hardcoded baseline URL path
     url = "https://googleapis.com"
     
     params = {
@@ -30,13 +31,14 @@ def search_google_cse(query):
     try:
         res = requests.get(url, params=params, timeout=5)
         if res.status_code != 200:
-            return [{"snippet": "Official portal indexing capacity temporarily throttled.", "link": ""}]
+            return [{"snippet": f"Google Search Engine returned error code {res.status_code}", "link": ""}]
         items = res.json().get("items", [])
         if not items:
-            return [{"snippet": "No updates matching this criteria are currently listed on the official web portals.", "link": ""}]
+            return [{"snippet": "No updates matching this criteria are listed on official portals.", "link": ""}]
         return [{"title": i.get("title", "Reference"), "link": i.get("link", ""), "snippet": i.get("snippet", "")} for i in items]
-    except Exception:
-        return [{"snippet": "Official education web servers timed out.", "link": ""}]
+    except Exception as e:
+        return [{"snippet": f"Search engine offline: {str(e)}", "link": ""}]
+
 
         
         results = []
