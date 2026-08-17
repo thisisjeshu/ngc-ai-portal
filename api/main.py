@@ -64,6 +64,23 @@ def generate_ai_reply(query, context_list):
 # The class name must be lowercase 'handler' for Vercel Serverless Architecture
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
+        # Serve the index.html file if a student opens your homepage link
+        if self.path == '/' or self.path == '/index.html':
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html')
+            self.end_headers()
+            
+            # Read and render the HTML layout file directly from the api folder
+            try:
+                current_dir = os.path.dirname(os.path.abspath(__file__))
+                html_path = os.path.join(current_dir, 'index.html')
+                with open(html_path, 'r', encoding='utf-8') as f:
+                    self.wfile.write(f.read().encode('utf-8'))
+            except Exception as e:
+                self.wfile.write(f"HTML Resource Read Failure: {str(e)}".encode('utf-8'))
+            return
+            
+        # Fallback route for system architecture health checks
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')
         self.end_headers()
@@ -71,7 +88,12 @@ class handler(BaseHTTPRequestHandler):
         return
 
     def do_POST(self):
-        # We process the request directly without strict path routing checks
+        # Accept text queries hitting either /api/main or /main
+        if self.path != '/api/main' and self.path != '/main':
+            self.send_response(404)
+            self.end_headers()
+            return
+
         content_length = int(self.headers['Content-Length'])
         req_body = json.loads(self.rfile.read(content_length).decode('utf-8'))
         user_query = req_body.get('message', '')
@@ -94,4 +116,5 @@ class handler(BaseHTTPRequestHandler):
             "sources": valid_sources
         }).encode('utf-8'))
         return
+
 
