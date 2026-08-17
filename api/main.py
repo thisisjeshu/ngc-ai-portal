@@ -7,7 +7,6 @@ from http.server import BaseHTTPRequestHandler
 def sanitize_user_input(text):
     if not text:
         return ""
-    # Strip dangerous layout control parameters
     clean_text = re.sub(r'[<>{}\[\]\\^\`|~]', '', text)
     return clean_text.strip()[:300]
 
@@ -16,7 +15,7 @@ def search_google_cse(query):
     cse_id = os.environ.get("GOOGLE_CSE_ID")
     
     if not api_key or not cse_id:
-        return [{"snippet": "Configuration verification warning: Check your parameters in Vercel settings.", "link": ""}]
+        return [{"snippet": "Configuration verification warning: Check your environment parameters in Vercel settings.", "link": ""}]
     
     url = "https://googleapis.com"
     params = {
@@ -29,7 +28,7 @@ def search_google_cse(query):
     try:
         res = requests.get(url, params=params, timeout=5)
         if res.status_code != 200:
-            return [{"snippet": "Official documentation search throttle ceiling reached.", "link": ""}]
+            return [{"snippet": f"Google Search API returned non-200 status: {res.status_code}", "link": ""}]
         items = res.json().get("items", [])
         if not items:
             return [{"snippet": "No updates matching this timeline criteria are listed on official portals.", "link": ""}]
@@ -42,8 +41,8 @@ def search_google_cse(query):
                 "snippet": item.get("snippet", "")
             })
         return results
-    except Exception:
-        return [{"snippet": "Official indices temporarily offline.", "link": ""}]
+    except Exception as e:
+        return [{"snippet": f"Official indices connection check error: {str(e)}", "link": ""}]
 
 def generate_ai_reply(query, context_list):
     gemini_key = os.environ.get("GEMINI_API_KEY")
@@ -54,6 +53,7 @@ def generate_ai_reply(query, context_list):
     for idx, ctx in enumerate(context_list):
         context_str += f"[Source {idx+1}]: {ctx['snippet']}\n"
 
+    # Upgraded, robust prompt system instruction layout
     prompt = (
         f"You are the conversational Telangana Higher Education AI Assistant for Nagarjuna Govt College.\n"
         f"You must strictly use the provided official search context to answer the user's question.\n"
@@ -64,22 +64,38 @@ def generate_ai_reply(query, context_list):
         f"Provide a friendly, highly professional, conversational response:"
     )
 
-    # FIXED: Clean, hardcoded endpoint parameters to block extraction loops
+    # RECONFIGURED: Use stable production API version endpoint paths
+    url = f"https://googleapis.com{gemini_key}"
     headers = {"Content-Type": "application/json"}
-    payload = {"contents": [{"parts": [{"text": prompt}]}]}
-    target_endpoint = "https://googleapis.com"
+    
+    # UPGRADED PAYLOAD: Clean production content list wrapping dictionary array
+    payload = {
+        "contents": [
+            {
+                "parts": [
+                    {"text": prompt}
+                ]
+            }
+        ]
+    }
 
     try:
-        # Pass the key explicitly as an independent query argument parameter
-        res = requests.post(f"{target_endpoint}?key={gemini_key}", headers=headers, json=payload, timeout=8)
+        res = requests.post(url, headers=headers, json=payload, timeout=10)
+        
+        # EXPLICIT GUARDRAIL: Safely capture raw non-JSON outputs before they cause a parsing crash
+        if res.status_code != 200:
+            return f"Gemini server dropped request with status code {res.status_code}. Raw output body: {res.text[:150]}"
+            
         res_json = res.json()
         
         if 'candidates' in res_json and len(res_json['candidates']) > 0:
-            return res_json['candidates']['content']['parts']['text']
-        else:
-            return "The AI engine could not finalize a content string parsing task. Please re-submit your query."
+            candidate = res_json['candidates'][0]
+            if 'content' in candidate and 'parts' in candidate['content'] and len(candidate['content']['parts']) > 0:
+                return candidate['content']['parts'][0]['text']
+        
+        return f"AI system returned unexpected response data matrix structure: {str(res_json)[:150]}"
     except Exception as e:
-        return f"AI communication link exception occurred: {str(e)}"
+        return f"AI processing system pipeline parsing exception occurred: {str(e)}"
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
